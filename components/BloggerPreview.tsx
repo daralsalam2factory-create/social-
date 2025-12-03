@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProductData, GeneratedContent } from '../types';
 import { Copy, Send, Tag, Search, BarChart3, Edit3, Eye, Check, RefreshCw, Plus, X } from 'lucide-react';
-import ReactQuill from 'react-quill';
+import Quill from 'quill';
 
 interface BloggerPreviewProps {
   product: ProductData;
@@ -19,6 +19,10 @@ const BloggerPreview: React.FC<BloggerPreviewProps> = ({ product, content, loadi
   const [seoTags, setSeoTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
 
+  // Quill Refs
+  const quillRef = useRef<HTMLDivElement>(null);
+  const quillInstanceRef = useRef<any>(null);
+
   useEffect(() => {
     if (content) {
       setEditorContent(content.blogContent);
@@ -27,6 +31,44 @@ const BloggerPreview: React.FC<BloggerPreviewProps> = ({ product, content, loadi
       setSeoTags(content.seoTags || []);
     }
   }, [content]);
+
+  // Initialize Quill when entering edit mode
+  useEffect(() => {
+    if (isEditing && quillRef.current && !quillInstanceRef.current) {
+        quillInstanceRef.current = new Quill(quillRef.current, {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                  [{ 'header': [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline', 'strike'],
+                  [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                  [{ 'direction': 'rtl' }],
+                  [{ 'align': [] }],
+                  ['link', 'image'],
+                  ['clean']
+                ],
+            },
+        });
+
+        // Set initial content
+        if (editorContent) {
+            quillInstanceRef.current.clipboard.dangerouslyPasteHTML(editorContent);
+        }
+
+        // Listen for changes
+        quillInstanceRef.current.on('text-change', () => {
+            if (quillInstanceRef.current) {
+                setEditorContent(quillInstanceRef.current.root.innerHTML);
+            }
+        });
+    }
+
+    // Cleanup when exiting edit mode
+    if (!isEditing) {
+        quillInstanceRef.current = null;
+    }
+  }, [isEditing]);
+
 
   if (loading) {
     return (
@@ -65,18 +107,6 @@ const BloggerPreview: React.FC<BloggerPreviewProps> = ({ product, content, loadi
     if (e.key === 'Enter') {
       handleAddTag();
     }
-  };
-
-  const modules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'direction': 'rtl' }],
-      [{ 'align': [] }],
-      ['link', 'image'],
-      ['clean']
-    ],
   };
 
   return (
@@ -130,13 +160,7 @@ const BloggerPreview: React.FC<BloggerPreviewProps> = ({ product, content, loadi
              
              <div className="flex-1 bg-white relative min-h-[500px]">
                  {isEditing ? (
-                    <ReactQuill 
-                        theme="snow"
-                        value={editorContent}
-                        onChange={setEditorContent}
-                        modules={modules}
-                        className="h-full"
-                    />
+                    <div ref={quillRef} className="h-full bg-white" />
                  ) : (
                     <div className="p-8 prose prose-lg max-w-none prose-img:rounded-xl">
                         <img src={product.images[0]} alt={product.title} className="w-full h-64 object-cover mb-6 rounded-xl shadow-sm" />
